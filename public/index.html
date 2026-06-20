@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI 생산성 작업 관리자</title>
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif; background: #fff; color: #111; }
+    .page { display: flex; min-height: 100vh; }
+    .main { flex: 1; padding: 28px; max-width: 920px; margin-right: 380px; }
+    h1 { margin-top: 0; font-size: 2rem; }
+    p { color: #333; line-height: 1.6; }
+    .field { margin-top: 22px; }
+    label { display: block; margin-bottom: 10px; font-weight: 700; }
+    textarea, input, select { width: 100%; border: 1px solid #ddd; border-radius: 10px; padding: 12px 14px; font-size: 1rem; background: #fff; color: #111; }
+    textarea { min-height: 140px; resize: vertical; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+    button { border: 1px solid #bbb; border-radius: 12px; padding: 10px 14px; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: transform 0.16s ease, background-color 0.12s ease, box-shadow 0.12s ease; background: #fff; color: #111; }
+    button:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.06); }
+    .primary { background: #111; color: #fff; border-color: #111; }
+    .secondary { background: #fff; color: #111; border-color: #ccc; }
+    .tasks-list { margin-top: 26px; }
+    .task-item { display: flex; flex-direction: column; gap: 12px; padding: 14px; background: #fff; border: 1px solid #eee; border-radius: 12px; position: relative; cursor: grab }
+    .task-item.dragging { opacity: 0.6; }
+    .task-item.drag-over { outline: 2px dashed rgba(0,0,0,0.12); transform: translateY(-4px); }
+    .task-meta { display: block; gap: 8px; }
+    .task-meta label { font-size: 0.92rem; margin-bottom: 6px; display:block }
+    .task-fields { display: block; }
+    .task-row { display:flex; flex-direction:column; gap:6px }
+    .task-fields input, .task-fields select { font-size: 0.95rem; }
+    .task-order { color: #64748b; font-size: 0.98rem; font-weight:700 }
+    .priority-badge { position:absolute; top:12px; right:12px; background:#111; color:#fff; padding:6px 8px; border-radius:999px; font-weight:800; font-size:0.85rem; min-width:26px; text-align:center }
+    .task-desc { color: #444; font-size: 0.92rem; line-height: 1.4; }
+    .status { margin-top: 18px; font-size: 0.95rem; color: #222; }
+    .panel { position: fixed; top: 20px; right: 20px; width: 340px; border-radius: 20px; box-shadow: 0 28px 72px rgba(15, 23, 42, 0.18); overflow: hidden; background: #0f172a; color: #fff; transition: height 0.25s ease; z-index: 2; }
+    .panel { position: fixed; top: 20px; right: 20px; width: 340px; border-radius: 12px; box-shadow: 0 18px 40px rgba(0,0,0,0.08); overflow: hidden; background: #fafafa; color: #111; transition: height 0.25s ease; z-index: 2; }
+    .panel.collapsed { height: 60px; }
+    .panel.open { height: 260px; }
+    .panel-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; cursor: pointer; }
+    .panel-title { font-size: 1rem; font-weight: 700; letter-spacing: -0.02em; color:#111 }
+    .panel-toggle { background: transparent; border: 1px solid #ddd; color: #111; border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+    .panel-pip { margin-left:8px; background:#111; color:#fff; border-radius:8px; padding:6px 8px; font-size:0.85rem }
+    .panel-content { display: none; padding: 14px 16px 18px; background: #fff; color: #111; min-height: 190px; }
+    .panel-content.show { display: block; }
+    .panel-label { font-size: 0.84rem; color: #444; margin-bottom: 6px; font-weight: 700; }
+    .panel-task { min-height: 60px; border-radius: 10px; background: #fafafa; padding: 12px 14px; color: #111; box-shadow: inset 0 1px 0 rgba(0,0,0,0.02); }
+    .panel-small { display: block; margin-top: 8px; color: #666; font-size: 0.88rem; }
+    #nextBtn { position: fixed; right: 28px; bottom: 24px; min-width: 160px; z-index: 3; }
+
+    /* Simple monochrome icons and moved animation */
+    .icon { width:18px; height:18px; vertical-align:middle; margin-right:8px; fill:none; stroke:#111; stroke-width:2; }
+    .task-name { display:flex; align-items:center; gap:8px; font-weight:700 }
+    .moved { animation: moveToTop 520ms ease both; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+    @keyframes moveToTop {
+      from { transform: translateY(18px) scale(0.98); background: #fff8e6 }
+      to { transform: translateY(0) scale(1); background: transparent }
+    }
+  </style>
+  <!-- Simple hand-drawn style SVG icons -->
+  <!-- html2canvas for capturing panel to support Picture-in-Picture popout -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;">
+    <symbol id="icon-hand" viewBox="0 0 24 24">
+      <path d="M7 11v-4a2 2 0 1 1 4 0v4" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M11 7v3" stroke-linecap="round" stroke-linejoin="round"></path>
+      <path d="M5 13v5a3 3 0 0 0 3 3h6" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24">
+      <path d="M7 5v14l10-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+    <symbol id="icon-check" viewBox="0 0 24 24">
+      <path d="M4 12l4 4L20 6" stroke-linecap="round" stroke-linejoin="round"></path>
+    </symbol>
+  </svg>
+</head>
+<body>
+  <div class="page">
+    <main class="main">
+      <h1>AI 생산성 작업 관리자</h1>
+      <p>자연어로 해야 할 일을 쓰면 AI가 우선순위와 순서를 정리합니다. 작업을 수정하고 수락하면 현재 작업과 다음 할 일이 자동으로 표시됩니다.</p>
+
+      <div class="field">
+        <label for="taskText">할 일 입력</label>
+        <textarea id="taskText" placeholder="예: 이메일 확인하고, VS Code에서 프로젝트 열고, 회의 링크를 확인합니다."></textarea>
+      </div>
+
+      <div class="button-row">
+        <button id="analyzeBtn" class="primary">AI로 분석</button>
+        <button id="acceptBtn" class="secondary">수락 및 첫 작업 실행</button>
+      </div>
+
+      <div class="status" id="statusMessage"></div>
+      
+
+      <section class="tasks-list" id="tasksList"></section>
+    </main>
+  </div>
+
+  <div class="panel collapsed" id="taskPanel">
+    <div class="panel-header" id="panelHeader">
+      <span class="panel-title">작업 패널</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="panel-pip" id="panelPipBtn">팝아웃</button>
+        <button class="panel-toggle" id="panelToggle">열기</button>
+      </div>
+    </div>
+    <div class="panel-content" id="panelContent">
+      <div>
+        <div class="panel-label">지금 할 일</div>
+        <div class="panel-task" id="currentTask">작업을 분석하거나 수락하면 현재 할 일이 표시됩니다.</div>
+      </div>
+      <div style="margin-top: 18px;">
+        <div class="panel-label">다음 할 일</div>
+        <div class="panel-task" id="nextTask">다음 작업이 여기 표시됩니다.</div>
+      </div>
+    </div>
+  </div>
+
+  <button id="nextBtn" class="primary">다음</button>
+
+  <script src="app.js"></script>
+</body>
+</html>
