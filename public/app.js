@@ -40,7 +40,7 @@ async function analyzeTasks() {
   analyzeBtn.disabled = true;
 
   try {
-    const response = await fetch('/plan', {
+    const response = await fetch('/api/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
