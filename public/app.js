@@ -264,7 +264,7 @@ async function runAndMove(index) {
       setTimeout(() => first.classList.remove('moved'), 900);
     }
   } catch (err) {
-    statusMessage.textContent = `로컬 실행기 연결에 실패했습니다: ${err.message}`;
+    statusMessage.textContent = `⚠️ ${err.message}`;
   }
 }
 
@@ -403,16 +403,34 @@ function updatePanel() {
 }
 
 async function launchTask(item) {
-  const localUrl = 'http://localhost:4321/launch-one';
-  const response = await fetch(localUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ item })
-  });
+  // browser 타입은 로컬 실행기 없이 직접 브라우저에서 열기
+  if (item.type === 'browser') {
+    const url = /^https?:\/\//i.test(item.command)
+      ? item.command
+      : `https://www.google.com/search?q=${encodeURIComponent(item.command)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    return;
+  }
 
-  if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    throw new Error(data.error || '로컬 실행기 응답 실패');
+  // app 타입은 로컬 실행기(localhost:4321) 시도
+  try {
+    const response = await fetch('http://localhost:4321/launch-one', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ item })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new Error(data.error || '로컬 실행기 응답 실패');
+    }
+  } catch (err) {
+    if (err.name === 'TypeError' || err.message.includes('fetch')) {
+      throw new Error(
+        `앱 실행을 위해 로컬 실행기가 필요합니다.\n` +
+        `터미널에서 "node local_launcher.js" 를 실행한 후 다시 시도하세요.`
+      );
+    }
+    throw err;
   }
 }
 
