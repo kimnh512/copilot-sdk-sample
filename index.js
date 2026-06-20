@@ -13,7 +13,8 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.post('/plan', async (req, res) => {
+// /api/plan is the path used by app.js (matches Azure Functions layout)
+app.post(['/plan', '/api/plan'], async (req, res) => {
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'text 필드가 필요합니다.' });
 

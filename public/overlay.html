@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { background: transparent; width: 380px; height: 230px; overflow: hidden; user-select: none; }
+
+    .card {
+      background: rgba(10, 15, 30, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 16px;
+      width: 380px;
+      height: 230px;
+      color: white;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Drag region for moving the window */
+    .header {
+      display: flex;
+      align-items: center;
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.07);
+      -webkit-app-region: drag;
+    }
+    .header-title { font-size: 0.88rem; font-weight: 700; flex: 1; opacity: 0.9; letter-spacing: -0.01em; }
+    .header-meta { font-size: 0.76rem; color: rgba(255,255,255,0.5); margin-right: 10px; }
+
+    .btn-icon {
+      -webkit-app-region: no-drag;
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,0.45);
+      cursor: pointer;
+      font-size: 1.05rem;
+      padding: 2px 6px;
+      border-radius: 5px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .btn-icon:hover { background: rgba(255,255,255,0.1); color: white; }
+
+    /* Main content */
+    .content { flex: 1; padding: 10px 14px 6px; }
+
+    .current-label {
+      font-size: 0.68rem;
+      color: #60a5fa;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      margin-bottom: 4px;
+    }
+    .current-task {
+      font-size: 0.98rem;
+      font-weight: 700;
+      line-height: 1.35;
+      min-height: 2.7em;
+      color: #f1f5f9;
+      word-break: break-word;
+    }
+    .idle-hint { color: rgba(255,255,255,0.3); font-size: 0.85rem; font-weight: 400; font-style: italic; }
+
+    .progress-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    .progress-bar { flex: 1; height: 4px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 999px; transition: width 0.5s ease; }
+    .progress-text { font-size: 0.74rem; color: rgba(255,255,255,0.45); white-space: nowrap; }
+
+    .next-hint { font-size: 0.76rem; color: rgba(255,255,255,0.38); margin-top: 5px; }
+    .next-hint span { color: rgba(255,255,255,0.65); }
+
+    /* Footer: XP bar + done button */
+    .footer { padding: 6px 14px 11px; display: flex; align-items: center; gap: 12px; }
+    .xp-section { flex: 1; }
+    .xp-label { font-size: 0.69rem; color: #fbbf24; font-weight: 700; margin-bottom: 3px; }
+    .xp-bar { height: 3px; background: rgba(255,255,255,0.09); border-radius: 999px; overflow: hidden; }
+    .xp-fill { height: 100%; background: linear-gradient(90deg, #fbbf24, #f97316); border-radius: 999px; transition: width 0.5s ease; }
+
+    .done-btn {
+      -webkit-app-region: no-drag;
+      background: #22c55e;
+      border: none;
+      color: white;
+      font-weight: 800;
+      font-size: 0.88rem;
+      padding: 8px 22px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: transform 0.12s, background 0.12s, box-shadow 0.12s;
+      box-shadow: 0 2px 14px rgba(34,197,94,0.4);
+      letter-spacing: -0.01em;
+    }
+    .done-btn:hover:not(:disabled) { background: #16a34a; transform: translateY(-1px); box-shadow: 0 4px 18px rgba(34,197,94,0.55); }
+    .done-btn:active:not(:disabled) { transform: scale(0.95); }
+    .done-btn:disabled { background: rgba(255,255,255,0.12); box-shadow: none; color: rgba(255,255,255,0.35); cursor: not-allowed; transform: none; }
+
+    /* XP burst floating text */
+    .xp-burst {
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fbbf24;
+      pointer-events: none;
+      opacity: 0;
+      z-index: 999;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.6);
+    }
+    .xp-burst.pop {
+      animation: burstAnim 0.85s ease forwards;
+    }
+    @keyframes burstAnim {
+      0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.7); }
+      35%  { opacity: 1; transform: translate(-50%, -85%) scale(1.25); }
+      100% { opacity: 0; transform: translate(-50%, -140%) scale(0.95); }
+    }
+
+    /* Level-up banner */
+    .levelup-banner {
+      display: none;
+      position: absolute;
+      bottom: 50px; left: 0; right: 0;
+      background: linear-gradient(90deg, #7c3aed, #6d28d9);
+      color: white;
+      font-size: 0.85rem;
+      font-weight: 800;
+      text-align: center;
+      padding: 6px;
+      z-index: 50;
+      animation: slideUp 2.5s ease forwards;
+    }
+    @keyframes slideUp {
+      0%   { opacity: 0; transform: translateY(10px); }
+      15%  { opacity: 1; transform: translateY(0); }
+      75%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+
+    /* All done overlay */
+    .all-done-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(10, 15, 30, 0.96);
+      border-radius: 16px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      z-index: 100;
+    }
+    .all-done-overlay.show { display: flex; }
+    .all-done-emoji { font-size: 2.6rem; animation: bounce 0.55s ease infinite alternate; }
+    @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-7px); } }
+    .all-done-title { font-size: 1.1rem; font-weight: 800; color: #22c55e; margin-top: 4px; }
+    .all-done-sub { font-size: 0.8rem; color: rgba(255,255,255,0.55); }
+    .restart-btn {
+      -webkit-app-region: no-drag;
+      margin-top: 10px;
+      background: #3b82f6;
+      border: none;
+      color: white;
+      font-weight: 700;
+      padding: 7px 20px;
+      border-radius: 9px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      transition: background 0.12s;
+    }
+    .restart-btn:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <span class="header-title">🎯 AI 작업 도우미</span>
+      <span class="header-meta" id="levelMeta">Lv.1 · 0 XP</span>
+      <button class="btn-icon" id="closeBtn" title="닫기">✕</button>
+    </div>
+
+    <div class="content">
+      <div class="current-label">⚡ 지금 할 일</div>
+      <div class="current-task" id="currentTask">
+        <span class="idle-hint">메인 창에서 작업을 분석·수락하면 여기 표시됩니다.</span>
+      </div>
+
+      <div class="progress-row">
+        <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+        <span class="progress-text" id="progressText">—</span>
+      </div>
+
+      <div class="next-hint" id="nextHint">다음: <span id="nextTaskName">—</span></div>
+    </div>
+
+    <div class="footer">
+      <div class="xp-section">
+        <div class="xp-label" id="xpLabel">Lv.1 · 0 / 50 XP</div>
+        <div class="xp-bar"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+      </div>
+      <button class="done-btn" id="doneBtn" disabled>✓ 완료!</button>
+    </div>
+
+    <div class="levelup-banner" id="levelupBanner"></div>
+
+    <div class="all-done-overlay" id="allDoneOverlay">
+      <div class="all-done-emoji">🏆</div>
+      <div class="all-done-title">모든 작업 완료!</div>
+      <div class="all-done-sub" id="allDoneSub">수고했습니다!</div>
+      <button class="restart-btn" id="restartBtn">새 작업 시작</button>
+    </div>
+  </div>
+
+  <div class="xp-burst" id="xpBurst">+10 XP ✨</div>
+
+  <script src="overlay.js"></script>
+</body>
+</html>

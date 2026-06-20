@@ -79,6 +79,7 @@ async function acceptTasks() {
   sortTasks();
   currentIndex = 0;
   await runAndMove(currentIndex);
+  syncOverlay();
 }
 
 // Copilot test removed
@@ -93,6 +94,7 @@ async function goToNextTask() {
 
   const nextIndex = currentIndex + 1;
   await runAndMove(nextIndex);
+  syncOverlay();
 }
 
 function togglePanel() {
@@ -257,6 +259,7 @@ async function runAndMove(index) {
     statusMessage.textContent = `실행 및 이동: ${item.name}`;
     renderTasks();
     updatePanel();
+    syncOverlay();
     // highlight moved item visually
     const first = tasksList.querySelector('.task-item');
     if (first) {
@@ -403,6 +406,13 @@ function updatePanel() {
 }
 
 async function launchTask(item) {
+  // Electron: use native shell via IPC (no local_launcher needed)
+  if (window.electronAPI) {
+    const result = await window.electronAPI.launchCommand(item);
+    if (!result.ok) throw new Error(result.error || '앱 실행 실패');
+    return;
+  }
+
   // browser 타입은 로컬 실행기 없이 직접 브라우저에서 열기
   if (item.type === 'browser') {
     const url = /^https?:\/\//i.test(item.command)
@@ -436,4 +446,25 @@ async function launchTask(item) {
 
 function escapeHtml(value) {
   return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// --- Electron overlay sync ---
+function syncOverlay() {
+  if (!window.electronAPI) return;
+  const remaining = tasks.slice(currentIndex);
+  const doneCount = currentIndex;
+  const totalTasks = tasks.length; // remaining + done
+  window.electronAPI.sendTasksUpdated({ tasks: remaining, doneCount, totalTasks: doneCount + remaining.length });
+}
+
+// Listen for task-complete events from the overlay panel
+if (window.electronAPI) {
+  window.electronAPI.onTaskComplete(() => {
+    if (!firstLaunched || !tasks.length) return;
+    if (currentIndex < tasks.length - 1) {
+      runAndMove(currentIndex + 1);
+    } else {
+      statusMessage.textContent = '모든 작업을 완료했습니다. 🎉';
+    }
+  });
 }
