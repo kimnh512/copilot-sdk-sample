@@ -1,9 +1,7 @@
 name: Deploy Node.js app to Azure Web App
 
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch: # 수동 실행만 허용 (Azure Web App 자격증명 설정 후 사용)
 
 jobs:
   build-and-deploy:
@@ -15,7 +13,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install dependencies
         run: npm ci
