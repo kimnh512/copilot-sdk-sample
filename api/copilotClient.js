@@ -1,5 +1,5 @@
 const { CopilotClient, approveAll } = require('@github/copilot-sdk');
-const { AzureOpenAI } = require('openai');
+const https = require('https');
 
 let copilotClientInstance;
 
@@ -16,31 +16,54 @@ async function ensureClient() {
   return copilotClientInstance;
 }
 
-function createAzureClient() {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const apiKey = process.env.AZURE_OPENAI_API_KEY;
-  if (!endpoint || !apiKey) return null;
-
-  return new AzureOpenAI({
-    endpoint,
-    apiKey,
-    apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-05-01-preview',
-    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
-  });
-}
-
+// Azure OpenAI REST API 직접 호출 (외부 패키지 불필요)
 async function generateWithAzure(prompt) {
-  const azureClient = createAzureClient();
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT.replace(/\/$/, '');
+  const apiKey = process.env.AZURE_OPENAI_API_KEY;
   const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o';
+  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-05-01-preview';
 
-  const response = await azureClient.chat.completions.create({
-    model: deployment,
+  const body = JSON.stringify({
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.3,
     max_tokens: 1000,
   });
 
-  return response.choices[0]?.message?.content || '';
+  const url = new URL(`${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'api-key': apiKey,
+          'Content-Length': Buffer.byteLength(body),
+        },
+      },
+      (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(data);
+            if (res.statusCode >= 400) {
+              reject(new Error(`Azure OpenAI 오류 ${res.statusCode}: ${json.error?.message || data}`));
+              return;
+            }
+            resolve(json.choices?.[0]?.message?.content || '');
+          } catch (e) {
+            reject(new Error(`Azure OpenAI 응답 파싱 실패: ${data}`));
+          }
+        });
+      }
+    );
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
 }
 
 async function generateWithCopilot(prompt) {
