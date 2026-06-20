@@ -37,6 +37,8 @@ jobs:
           api_location: "api"    # Azure Functions API source code path
           output_location: ""    # Built app content directory - optional
           ###### End of Repository/Build Configurations ######
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_GITHUB_TOKEN }}
 
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
