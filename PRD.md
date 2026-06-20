@@ -137,11 +137,17 @@ AI 생산성 작업 관리자 (AI Productivity Task Manager)
 
 ## 7. 환경변수
 
+AI 엔진 우선순위: **Azure OpenAI → GitHub Copilot SDK → Mock(개발용)**
+
 | 변수명 | 필수 | 설명 |
 |--------|------|------|
-| `COPILOT_GITHUB_TOKEN` | 권장 | GitHub Copilot API 인증 토큰 |
+| `AZURE_OPENAI_ENDPOINT` | 권장 | Azure OpenAI 리소스 엔드포인트 (예: `https://<resource>.openai.azure.com/`) |
+| `AZURE_OPENAI_API_KEY` | 권장 | Azure OpenAI API 키 |
+| `AZURE_OPENAI_DEPLOYMENT` | 선택 | Azure OpenAI 배포 이름 (기본값: `gpt-4o`) |
+| `AZURE_OPENAI_API_VERSION` | 선택 | Azure OpenAI API 버전 (기본값: `2024-05-01-preview`) |
+| `COPILOT_GITHUB_TOKEN` | 선택 | GitHub Copilot API 인증 토큰 (Azure OpenAI 미설정 시 폴백) |
 | `COPILOT_MOCK` | 선택 | `true` 설정 시 Mock 응답 반환 (개발·테스트용) |
-| `COPILOT_MODEL` | 선택 | 사용할 모델명 (기본값: `gpt-5`) |
+| `COPILOT_MODEL` | 선택 | Copilot SDK 사용 모델명 (기본값: `gpt-4o`) |
 | `PORT` | 선택 | 로컬 서버 포트 (기본값: `3000`) |
 
 ---

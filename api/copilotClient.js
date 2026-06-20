@@ -1,29 +1,51 @@
 const { CopilotClient, approveAll } = require('@github/copilot-sdk');
+const { AzureOpenAI } = require('openai');
 
-let client;
+let copilotClientInstance;
 
 async function ensureClient() {
-  if (client) return client;
+  if (copilotClientInstance) return copilotClientInstance;
 
   const token = process.env.COPILOT_GITHUB_TOKEN;
   if (!token) {
     throw new Error('COPILOT_GITHUB_TOKEN 환경 변수가 설정되지 않았습니다.');
   }
 
-  client = new CopilotClient({ logLevel: 'info', gitHubToken: token });
-  await client.start();
-  return client;
+  copilotClientInstance = new CopilotClient({ logLevel: 'info', gitHubToken: token });
+  await copilotClientInstance.start();
+  return copilotClientInstance;
 }
 
-async function generate(prompt) {
-  if (!prompt) throw new Error('prompt가 필요합니다.');
+function createAzureClient() {
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+  const apiKey = process.env.AZURE_OPENAI_API_KEY;
+  if (!endpoint || !apiKey) return null;
 
-  if (process.env.COPILOT_MOCK === 'true') {
-    return generateMockTasksFromPrompt(prompt);
-  }
+  return new AzureOpenAI({
+    endpoint,
+    apiKey,
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION || '2024-05-01-preview',
+    deployment: process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o',
+  });
+}
 
+async function generateWithAzure(prompt) {
+  const azureClient = createAzureClient();
+  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o';
+
+  const response = await azureClient.chat.completions.create({
+    model: deployment,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.3,
+    max_tokens: 1000,
+  });
+
+  return response.choices[0]?.message?.content || '';
+}
+
+async function generateWithCopilot(prompt) {
   const c = await ensureClient();
-  const model = process.env.COPILOT_MODEL || 'gpt-5';
+  const model = process.env.COPILOT_MODEL || 'gpt-4o';
   const session = await c.createSession({ model, onPermissionRequest: approveAll });
 
   try {
@@ -36,6 +58,22 @@ async function generate(prompt) {
   } finally {
     await session.disconnect();
   }
+}
+
+async function generate(prompt) {
+  if (!prompt) throw new Error('prompt가 필요합니다.');
+
+  if (process.env.COPILOT_MOCK === 'true') {
+    return generateMockTasksFromPrompt(prompt);
+  }
+
+  // Azure OpenAI 환경변수가 설정된 경우 우선 사용
+  if (process.env.AZURE_OPENAI_ENDPOINT && process.env.AZURE_OPENAI_API_KEY) {
+    return generateWithAzure(prompt);
+  }
+
+  // 폴백: GitHub Copilot SDK
+  return generateWithCopilot(prompt);
 }
 
 function generateMockTasksFromPrompt(prompt) {
@@ -61,9 +99,9 @@ function generateMockTasksFromPrompt(prompt) {
 }
 
 async function stop() {
-  if (!client) return;
-  await client.stop();
-  client = undefined;
+  if (!copilotClientInstance) return;
+  await copilotClientInstance.stop();
+  copilotClientInstance = undefined;
 }
 
 module.exports = { generate, stop };
