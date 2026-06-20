@@ -85,8 +85,7 @@ function generateMockTasksFromPrompt(prompt) {
     });
   }
 
-  const urlMatch = userText.match(/https?:\/\/[^
-\s"']+/i);
+  const urlMatch = userText.match(/https?:\/\/[^\s"']+/i);
   if (urlMatch) {
     commands.push({
       name: '웹 페이지 열기',
