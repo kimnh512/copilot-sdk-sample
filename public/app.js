@@ -60,6 +60,7 @@ async function analyzeTasks() {
       return;
     }
 
+    normalizePriorities();
     sortTasks();
     currentIndex = 0;
     firstLaunched = false;
@@ -303,7 +304,14 @@ function handleTaskEdit(event) {
 
   if (field === 'priority' && Number(target.value) === 1) {
     moveToTop(index);
+    normalizePriorities();
+    renderTasks();
+    updatePanel();
     return;
+  }
+
+  if (field === 'priority') {
+    normalizePriorities();
   }
 
   if (field === 'order') {
@@ -364,6 +372,12 @@ tasksList.addEventListener('dragstart', onDragStart);
 tasksList.addEventListener('dragover', onDragOver);
 tasksList.addEventListener('drop', onDrop);
 tasksList.addEventListener('dragend', onDragEnd);
+
+function normalizePriorities() {
+  if (!tasks.length) return;
+  tasks.sort((a, b) => a.priority - b.priority || a.order - b.order);
+  tasks.forEach((task, i) => { task.priority = i + 1; });
+}
 
 function sortTasks() {
   tasks.sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));

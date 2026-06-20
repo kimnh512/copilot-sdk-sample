@@ -51,6 +51,7 @@ app.post('/plan', async (req, res) => {
     }
   }
 
+  normalizePriorities(tasks);
   res.json({ tasks, warning });
 });
 
@@ -70,6 +71,12 @@ app.listen(port, () => {
   console.log(`App listening on port ${port}`);
   console.log(`Open http://localhost:${port}/ to access the UI`);
 });
+
+function normalizePriorities(tasks) {
+  if (!tasks.length) return;
+  tasks.sort((a, b) => a.priority - b.priority || a.order - b.order);
+  tasks.forEach((task, i) => { task.priority = i + 1; });
+}
 
 function parseCopilotTasks(text) {
   if (!text || typeof text !== 'string') return [];
